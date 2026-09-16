@@ -1,33 +1,60 @@
 #pragma once
 
-#include "CharArray.hpp"
+#include "IFile.hpp"
+#include "FileManager.hpp"
 
 namespace pankey{
 
     namespace FileSystem{
 
-        using FilePath = pankey::Type::Array::CharArray;
+        using FilePath = pankey::Support::File::FilePath;
+        using FileMode = pankey::Support::File::FileMode;
+        using ReadStatus = pankey::Support::File::ReadStatus;
+        using IFile = pankey::Support::File::IFile;
+        using FileManager = pankey::Support::File::FileManager;
 
+        // Thin adapter kept for the existing GGUF / NeuralNetwork readers.
+        // New code should use Support::File::FileManager directly.
         class BinaryFile{
             public:
-                virtual ~BinaryFile(){}
+                BinaryFile(IFile& a_file) : m_files(a_file){}
 
-                virtual bool openRead(const FilePath& a_path) = 0;
-                virtual bool openWrite(const FilePath& a_path) = 0;
-                virtual void close() = 0;
-                virtual bool isOpen() const = 0;
-                virtual bool skip(unsigned long long a_byte_count) = 0;
-                virtual bool seek(unsigned long long a_position) = 0;
-                virtual unsigned long long position() const = 0;
+                bool openRead(const FilePath& a_path){
+                    return m_files.openRead(a_path);
+                }
+
+                bool openWrite(const FilePath& a_path){
+                    return m_files.openWrite(a_path);
+                }
+
+                void close(){
+                    m_files.close();
+                }
+
+                bool isOpen() const{
+                    return m_files.isOpen();
+                }
+
+                bool skip(unsigned long long a_byte_count){
+                    return m_files.skip(a_byte_count);
+                }
+
+                bool seek(unsigned long long a_position){
+                    return m_files.seek(a_position);
+                }
+
+                unsigned long long position() const{
+                    return m_files.position();
+                }
 
                 template<class Value>
                 bool read(Value& a_value){
-                    return readBytes(&a_value, sizeof(Value));
+                    return m_files.read(a_value);
                 }
 
                 template<class Value>
                 bool write(const Value& a_value){
-                    return writeBytes(&a_value, sizeof(Value));
+                    return m_files.write(a_value);
                 }
 
                 template<class Policy>
@@ -35,26 +62,11 @@ namespace pankey{
                     pankey::DataStructure::Array::ArrayPointer<Policy>& a_values,
                     int a_count
                 ){
-                    if(a_count < 0 || a_values.getSize() < a_count){
-                        return false;
-                    }
-                    if(a_count == 0){
-                        a_values.setLength(0);
-                        return true;
-                    }
-                    if(!readBytes(
-                        a_values.getArrayPointer(),
-                        static_cast<int>(sizeof(typename Policy::VALUE_TYPE) * a_count)
-                    )){
-                        return false;
-                    }
-                    a_values.setLength(a_count);
-                    return true;
+                    return m_files.readArray(a_values, a_count);
                 }
 
             protected:
-                virtual bool readBytes(void* a_values, int a_byte_count) = 0;
-                virtual bool writeBytes(const void* a_values, int a_byte_count) = 0;
+                FileManager m_files;
         };
     }
 }
